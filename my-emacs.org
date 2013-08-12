@@ -1,0 +1,905 @@
+This [[http://orgmode.org/][Org-Mode]] document contains my emacs configuration. It uses
+org-babel to keep a litterate programming setup. 
+
+It is loaded from init.el.
+* Initialization
+This section contains all the loading functions.
+** Load paths
+  #+name: my-emacs-load-paths
+  #+begin_src emacs-lisp
+    (add-to-list 'load-path my-emacs-dir)
+    (setq package-user-dir (concat my-emacs-dir "elpa"))
+  #+end_src
+
+** Load el-get
+  #+name: my-emacs-load-el-get
+  #+begin_src emacs-lisp
+    (add-to-list 'load-path "~/.emacs.d/el-get/el-get")
+    
+    (unless (require 'el-get nil 'noerror)
+      (with-current-buffer
+          (url-retrieve-synchronously
+           "https://raw.github.com/dimitri/el-get/master/el-get-install.el")
+        (let (el-get-master-branch)
+          (goto-char (point-max))
+          (eval-print-last-sexp))))
+  #+end_src
+
+** Package settings for el-get
+  #+begin_src emacs-lisp
+    (setq el-get-sources
+     '((:name evil
+            :website "http://gitorious.org/evil/pages/Home"
+            :description "Evil is an extensible vi layer for Emacs. It
+            emulates the main features of Vim, and provides facilities
+            for writing custom extensions."
+            :type git
+            :url "git://gitorious.org/evil/evil.git"
+            :features evil
+            :depends undo-tree
+            :build (("make" "all" "info"))
+            :info "doc")
+       (:name python-django-ng
+            :website "https://github.com/fgallina/python-django.el"
+            :description "An Emacs package for managing Django projects."
+            :type git
+            :url "https://github.com/fgallina/python-django.el.git"
+            :features python-django)
+       (:name jedi-noinstall
+            :website "https://github.com/tkf/emacs-jedi"
+            :description "Python auto-completion for Emacs"
+            :type git
+            :submodule nil
+            :url "https://github.com/tkf/emacs-jedi.git"
+            :depends (epc auto-complete)
+            :features jedi)
+       (:name haxe-mode
+            :website "https://bitbucket.org/jpsecher/haxe-mode"
+            :description "NU/Emacs mode for editing haXe programs."
+            :type git
+            :url "https://gist.github.com/927189fd9c564863362f.git" 
+            :features haxe-mode)))
+    (defvar viel:el-get-packages
+      (append
+      '(smex
+        undo-tree
+        evil
+        auctex
+        haskell-mode
+        yasnippet
+        python
+        ghc-mod
+        sr-speedbar
+        lua-mode
+        haxe-mode
+        mu4e
+        emacs-w3m
+        magit
+        yaml-mode
+        python-django-ng
+        powerline
+        projectile
+        switch-window
+        ace-jump-mode
+        ein
+        alert
+        web-mode
+        evil-surround
+        multi-term)
+      (mapcar 'el-get-source-name el-get-sources)))
+    
+    (el-get 'sync viel:el-get-packages) 
+  #+end_src
+
+** Handle OSX PATH bug
+  #+begin_src emacs-lisp
+    (let (osx-paths)
+      (dolist (path '("/Users/vaiter/.cabal/bin" "/Users/vaiter/Library/Enthought/Canopy_64bit/User/bin" "/usr/texbin/" "/usr/local/bin" "/opt/local/bin" "/opt/local/sbin" "$HOME/bin")
+                    (setenv "PATH" (concat osx-paths (getenv "PATH"))))
+        (push path exec-path)
+        (setq osx-paths (concat (concat path ":") osx-paths))))
+  #+end_src
+
+* My defuns
+
+- Wait after `k` to handle `kj` 
+from http://zuttobenkyou.wordpress.com/2011/02/15/some-thoughts-on-emacs-and-vim/
+  #+begin_src emacs-lisp
+    (evil-define-command cofi/maybe-exit ()
+      :repeat change
+      (interactive)
+      (let ((modified (buffer-modified-p)))
+        (insert "k")
+        (let ((evt (read-event (format "Insert %c to exit insert state" ?j)
+                   nil 0.5)))
+          (cond
+           ((null evt) (message ""))
+           ((and (integerp evt) (char-equal evt ?j))
+        (delete-char -1)
+        (set-buffer-modified-p modified)
+        (push 'escape unread-command-events))
+           (t (setq unread-command-events (append unread-command-events
+                              (list evt))))))))
+  #+end_src
+
+- Rotate window helper
+  #+BEGIN_SRC emacs-lisp
+     (defun rotate-windows ()
+       "Rotate your windows" (interactive) (cond ((not (> (count-windows) 1)) (message "You can't rotate a single window!"))
+    (t
+     (setq i 1)
+     (setq numWindows (count-windows))
+     (while  (< i numWindows)
+       (let* (
+              (w1 (elt (window-list) i))
+              (w2 (elt (window-list) (+ (% i numWindows) 1)))
+              (b1 (window-buffer w1))
+              (b2 (window-buffer w2))
+              (s1 (window-start w1))
+              (s2 (window-start w2))
+              )
+         (set-window-buffer w1  b2)
+         (set-window-buffer w2 b1)
+         (set-window-start w1 s2)
+         (set-window-start w2 s1)
+         (setq i (1+ i)))))))
+  #+END_SRC
+   
+* General environments settings
+
+** Smex
+- Smex is a M-x enhancement for Emacs.
+  #+begin_src emacs-lisp
+    (require 'smex)
+  #+end_src
+
+-  Use Smex for recent M-x commands a la ido.
+  #+begin_src emacs-lisp
+    (smex-initialize)
+  #+end_src
+
+** Windmove and Switch-window
+- To navigate buffers with S-arrows
+  #+begin_src emacs-lisp
+    (require 'windmove)
+    (windmove-default-keybindings)
+  #+end_src
+
+- And to have a visual choice
+  #+BEGIN_SRC emacs-lisp
+    (require 'switch-window)
+  #+END_SRC
+
+** Ido
+- Initialize ido
+  #+begin_src emacs-lisp
+    (require 'ido)  
+  #+end_src
+
+- Fuzzy matching
+  #+begin_src emacs-lisp
+    (setq ido-enable-flex-matching t)
+  #+end_src
+
+- Don't look in other directories (no merging)
+  #+begin_src emacs-lisp
+    (setq ido-auto-merge-work-directories-length nil)
+  #+end_src
+
+- Don't ask for throw-away buffer creation
+  #+begin_src emacs-lisp
+    (setq ido-create-new-buffer 'always)
+  #+end_src
+
+- Guess context
+  #+begin_src emacs-lisp
+    (setq ido-use-filename-at-point 'guess)
+  #+end_src
+
+- Completion of filenames everywhere
+  #+begin_src emacs-lisp
+    (setq ido-everywhere t)
+  #+end_src
+
+- Display order
+  #+begin_src emacs-lisp
+    (setq ido-file-extensions-order '(".org" ".tex" ".py" ".el" ".rb"))
+  #+end_src
+
+- Activate Ido
+  #+begin_src emacs-lisp
+    (ido-mode 1)
+  #+end_src
+  
+** Uniquify
+- Init Uniquify
+  #+begin_src enacs-lisp
+   (require 'uniquify)
+  #+end_src
+
+- Style: "Makefile|source"
+  #+begin_src emacs-lisp
+   (setq uniquify-buffer-name-style 'reverse)
+   (setq uniquify-separator "|")
+  #+end_src
+
+- Rename buffer names after killing one
+  #+begin_src emacs-lisp
+   (setq uniquify-after-kill-buffer-p t)
+  #+end_src
+
+- Ignore if no ambiguity
+  #+begin_src emacs-lisp
+   (setq uniquify-ignore-buffers-re "^\\*")
+  #+end_src
+
+** General
+
+- No startup splash screen.
+  #+begin_src emacs-lisp
+    (setq inhibit-startup-message t)
+  #+end_src
+
+- Add directory info to distinguish buffers.
+  #+begin_src emacs-lisp
+    (setq uniquify-buffer-name-style 'forward)
+  #+end_src
+
+- Don't make me type out 'yes' and 'no'
+  #+begin_src emacs-lisp
+    (fset 'yes-or-no-p 'y-or-n-p)
+  #+end_src
+
+- Autorevert all buffers.
+  #+begin_src emacs-lisp
+    (global-auto-revert-mode t)
+  #+end_src
+
+- Search case sensitive
+  #+begin_src emacs-lisp
+    (setq case-fold-search t)
+  #+end_src
+
+- Put backups and autosaves in temp dir.
+  #+begin_src emacs-lisp
+    (setq backup-directory-alist
+          `((".*" . ,temporary-file-directory)))
+    (setq auto-save-file-name-transforms
+          `((".*" ,temporary-file-directory t)))
+  #+end_src
+
+- Options to consider
+  #+begin_src emacs-lisp
+    ;; (put 'ido-complete 'disabled nil)
+    ;; (put 'ido-exit-minibuffer 'disabled nil)
+    ;; (put 'dired-find-alternate-file 'disabled nil)
+    ;; (put 'autopair-newline 'disabled nil)
+    ;; (put 'upcase-region 'disabled nil)
+    ;; (put 'downcase-region 'disabled nil)
+    ;; (put 'narrow-to-region 'disabled nil)
+  #+end_src
+
+** Editing
+
+- UTF-8 ALL THE THINGS !
+  #+begin_src emacs-lisp
+    (prefer-coding-system 'utf-8)
+    (set-language-environment 'utf-8)
+    (set-default-coding-systems 'utf-8)
+    (set-terminal-coding-system 'utf-8)
+    (set-selection-coding-system 'utf-8)
+  #+end_src
+
+- No hard tabs
+  #+begin_src emacs-lisp
+    (setq-default indent-tabs-mode nil)   ;; don't use tabs to indent
+    (setq-default tab-width 8)            ;; but maintain correct appearance    
+  #+end_src
+
+- Apply syntax highlighting to all buffers
+  #+begin_src emacs-lisp
+    (global-font-lock-mode 1)
+  #+end_src
+
+- Highest level of fontification
+  #+begin_src emacs-lisp
+    (setq font-lock-maximum-decoration t)
+  #+end_src
+
+- Match ( and ) without any delay
+  #+begin_src emacs-lisp
+    (show-paren-mode 1)
+    (setq show-paren-delay 0)
+  #+end_src
+
+- Auto match bracket-like
+  #+begin_src emacs-lisp
+    (electric-pair-mode t)
+  #+end_src
+
+- delete the selection with a keypress
+  #+begin_src emacs-lisp
+    (delete-selection-mode t)
+  #+end_src
+
+- Define reload-my-emacs
+  #+begin_src emacs-lisp
+    (defun reload-my-emacs ()
+      (interactive)
+      (load-file "~/.emacs.d/init.el"))
+  #+end_src
+
+** Persistant registers
+Registers are obtained through C-x r j KEY
+- my-emacs.org -> e
+  #+begin_src emacs-lisp
+    (set-register ?e (cons 'file "~/.emacs.d/my-emacs.org"))
+  #+end_src
+
+- links.org -> l
+  #+BEGIN_SRC emacs-lisp
+    (set-register ?l (cons 'file "~/Documents/org_files/links.org"))
+  #+END_SRC
+
+* Look
+
+** General
+
+- Less flickery display
+  #+begin_src emacs-lisp
+    (setq redisplay-dont-pause t)
+  #+end_src
+
+- Where am I ?
+  #+begin_src emacs-lisp
+    (line-number-mode 1)
+    (column-number-mode 1)
+  #+end_src
+
+- Always show line number
+  #+begin_src emacs-lisp
+    (require 'linum)
+    (setq linum-disabled-modes-list '(eshell-mode
+                                      wl-summary-mode
+                                      compilation-mode
+                                      dired-mode
+                                      speedbar-mode
+                                      mu4e-main-mode
+                                      mu4e-about-mode
+                                      mu4e-view-mode
+                                      mu4e-headers-mode
+                                      doc-view-mode))
+    (defun linum-on ()
+      (unless (or (minibufferp) (member major-mode linum-disabled-modes-list)
+                (and (not (eq (buffer-name) "*scratch*")) 
+                 (string-match "*" (buffer-name))))
+        (linum-mode 1)))
+    (global-linum-mode 1)
+    (setq linum-eager nil)
+  #+end_src
+
+- No anoying bip nor flashing
+  #+begin_src emacs-lisp
+    (setq ring-bell-function 'ignore)
+  #+end_src
+
+- No GUI
+  #+begin_src emacs-lisp
+    (when (display-graphic-p)
+      (setq use-file-dialog nil)
+      (setq use-dialog-box nil)
+      (mouse-wheel-mode t))
+  #+end_src
+
+- No clutter
+  #+BEGIN_SRC emacs-lisp
+    (if (fboundp 'scroll-bar-mode) (scroll-bar-mode -1))
+    (if (fboundp 'tool-bar-mode) (tool-bar-mode -1))
+    (if (fboundp 'menu-bar-mode) (menu-bar-mode -1))
+  #+END_SRC
+
+** Fonts
+- Define fonts to use for the GUI
+  #+begin_src emacs-lisp
+    (when (display-graphic-p)
+      (set-face-font 'default "Monaco-12")
+      (set-face-font 'variable-pitch "Monaco-12")
+      (set-face-font 'fixed-pitch "Monaco-12"))
+    ;; Handle issue with emacsclient
+    ;; (add-to-list 'default-frame-alist '(font . "Inconsolata-11"))
+  #+end_src
+  
+** Theme
+- Paths
+  #+BEGIN_SRC emacs-lisp
+    (add-to-list 'load-path "~/.emacs.d/themes/solarized/")
+    (add-to-list 'load-path "~/.emacs.d/themes/tomorrow/")
+    (add-to-list 'custom-theme-load-path "~/.emacs.d/themes/solarized/")
+    (add-to-list 'custom-theme-load-path "~/.emacs.d/themes/zenburn/")
+    (add-to-list 'custom-theme-load-path "~/.emacs.d/themes/tomorrow/")
+  #+END_SRC
+
+- Color Theme everywhere
+  #+begin_src emacs-lisp
+    (setq color-theme-is-global t)
+  #+end_src
+
+- Default theme
+  #+BEGIN_SRC emacs-lisp
+    (load-theme 'sanityinc-tomorrow-night t)
+    (setq sv/current-theme 'sanityinc-tomorrow-night)
+    (setq sv/themes '(sanityinc-tomorrow-night
+                      sanityinc-tomorrow-blue
+                      sanityinc-tomorrow-day
+                      sanityinc-tomorrow-bright
+                      sanityinc-tomorrow-eighties
+                      zenburn
+                      solarized-light
+                      solarized-dark))
+  #+END_SRC
+
+
+- Theme switcher helper
+  #+BEGIN_SRC emacs-lisp
+    (defun sv/enable-theme (theme)
+      (if sv/current-theme (disable-theme sv/current-theme))
+      (setq sv/current-theme theme)
+      (load-theme theme t))
+    
+    (defun sv/rotate-left (a-list)
+      (append (cdr a-list) (list (car a-list))))
+    
+    (defun sv/cycle-themes ()
+      (interactive)
+      (setq sv/themes (append (cdr sv/themes) (list (car sv/themes))))
+      (sv/enable-theme (car sv/themes)))
+  #+END_SRC
+  
+** Speedbar
+- To classify
+  #+begin_src emacs-lisp
+    ;; show all files
+    (setq speedbar-show-unknown-files t)
+    
+    ;; turn off the ugly icons
+    (setq speedbar-use-images nil)
+    
+    ;; left-side pane
+    (setq sr-speedbar-right-side nil)
+    
+    ;; don't refresh on buffer changes
+    (setq sr-speedbar-auto-refresh nil)
+  #+end_src
+  
+* General Mode
+
+** Undo Tree
+- undo-tree for linear branches
+  #+begin_src emacs-lisp
+    (require 'undo-tree)
+  #+end_src
+
+** Evil
+- Init evil
+  #+begin_src emacs-lisp
+    (require 'evil)
+    (evil-mode 1)
+  #+end_src
+
+- Map `kj` as ESC key
+  #+begin_src emacs-lisp
+    (define-key evil-insert-state-map "k" #'cofi/maybe-exit)
+  #+end_src
+
+- Default behavior of >> and << to 2 spaces
+  #+begin_src emacs-lisp
+    (setq evil-shift-width 2)     
+  #+end_src
+
+- Use evil-surrond
+  #+BEGIN_SRC emacs-lisp
+    (require 'surround)
+    (global-surround-mode 1)
+  #+END_SRC
+  
+** Auto-complete
+- Init auto-complete
+  #+begin_src emacs-lisp
+    (require 'auto-complete-config)
+    (ac-config-default)
+  #+end_src
+
+** Yasnippet
+- Init yas
+  #+begin_src emacs-lisp
+        (require 'yasnippet)
+        (yas/global-mode 1)
+        (define-key yas-minor-mode-map [(tab)] nil)
+        ;; (yas/load-directory "~/.emacs.d/snippets/")
+        
+        ;; (add-hook 'LaTeX-mode-hook
+        ;;           '(lambda()
+        ;;              (local-set-key [tab] 'yas/expand)))
+        
+  #+end_src
+
+** Highlight-indentation
+
+- Load it for every programming buffers.
+  #+begin_src emacs-lisp
+    (add-hook 'prog-mode-hook (lambda () (highlight-indentation-mode 1)))
+  #+end_src
+
+** AceJump
+
+- Load AceJump
+  #+BEGIN_SRC emacs-lisp
+    (require 'ace-jump-mode)
+  #+END_SRC
+ 
+** Powerline
+
+- Require powerline
+  #+BEGIN_SRC emacs-lisp
+    (require 'powerline)
+    (setq powerline-arrow-shape 'arrow)
+  #+END_SRC
+ 
+** Projectile
+
+- Basic conf
+  #+BEGIN_SRC emacs-lisp
+    (projectile-global-mode)
+  #+END_SRC
+
+** Alert
+
+- Basic conf
+  #+BEGIN_SRC emacs-lisp
+    (require 'alert)
+    (setq alert-default-style 'growl)
+  #+END_SRC
+ 
+* Lang Mode
+
+** Haskell
+- Doc mode
+  #+begin_src emacs-lisp
+    (add-hook 'haskell-mode-hook 'turn-on-haskell-doc-mode)
+  #+end_src
+
+- Indent
+  #+begin_src emacs-lisp
+    (add-hook 'haskell-mode-hook 'turn-on-haskell-indentation)
+  #+end_src
+
+** LaTeX
+
+- Use pdflatex
+  #+begin_src emacs-lisp
+    (setq TeX-PDF-mode t)
+  #+end_src
+
+- Enable parse on save
+  #+begin_src emacs-lisp
+    (setq TeX-auto-save t)
+  #+end_src
+
+- Enable parse on load
+  #+begin_src emacs-lisp
+    (setq TeX-parse-self t)
+  #+end_src
+
+- Don't autofill !
+  #+begin_src emacs-lisp
+    (add-hook 'LaTeX-mode-hook 'visual-line-mode)
+  #+end_src
+
+- Spell checking
+  #+begin_src emacs-lisp
+    (add-hook 'LaTeX-mode-hook 'flyspell-mode)
+  #+end_src
+
+- Faster math typo
+  #+begin_src emacs-lisp
+    (add-hook 'LaTeX-mode-hook 'LaTeX-math-mode)
+  #+end_src
+
+- Use reftex !
+  #+begin_src emacs-lisp
+    (add-hook 'LaTeX-mode-hook 'turn-on-reftex)
+    (setq reftex-plug-into-AUCTeX t)
+  #+end_src
+
+- Don't ask to save
+  #+begin_src emacs-lisp
+    (setq TeX-save-query nil)
+  #+end_src
+
+- Tex-Master ask
+  #+begin_src emacs-lisp
+    (setq TeX-master nil)
+  #+end_src
+
+- Use latexmk
+SyncTeX is setup via ~/.latexmkrc
+  #+begin_src emacs-lisp
+    (add-hook 'LaTeX-mode-hook (lambda ()
+        (push
+             '("Latexmk" "latexmk -pdf %s" TeX-run-TeX nil t
+               :help "Run Latexmk")
+             TeX-command-list)))
+    (add-hook 'TeX-mode-hook '(lambda () (setq TeX-command-default "Latexmk")))
+  #+end_src
+
+** Python
+- Use Gallina python mode
+  #+begin_src emacs-lisp
+    (require 'python)
+  #+end_src
+- Auto indent new line
+  #+begin_src emacs-lisp
+    (add-hook 'python-mode-hook
+      #'(lambda ()
+          (define-key python-mode-map "\C-m" 'newline-and-indent)))
+  #+end_src
+- Activate Jedi
+  #+begin_src emacs-lisp
+    (autoload 'jedi:setup "jedi" nil t)
+    (add-hook 'python-mode-hook 'jedi:setup)
+    (setq jedi:setup-keys t)
+    (setq jedi:complete-on-dot t) 
+  #+end_src
+- Activate django-mode
+  #+begin_src emacs-lisp
+    (require 'python-django)
+  #+end_src
+- Activate EIN
+  #+BEGIN_SRC emacs-lisp
+    (require 'ein)
+  #+END_SRC
+  
+** Web-mode
+  #+BEGIN_SRC emacs-lisp
+    (require 'web-mode)
+    (add-to-list 'auto-mode-alist '("\\.phtml\\'" . web-mode))
+    (add-to-list 'auto-mode-alist '("\\.tpl\\.php\\'" . web-mode))
+    (add-to-list 'auto-mode-alist '("\\.jsp\\'" . web-mode))
+    (add-to-list 'auto-mode-alist '("\\.as[cp]x\\'" . web-mode))
+    (add-to-list 'auto-mode-alist '("\\.erb\\'" . web-mode))
+    (add-to-list 'auto-mode-alist '("\\.mustache\\'" . web-mode))
+    (add-to-list 'auto-mode-alist '("\\.djhtml\\'" . web-mode))
+    (add-to-list 'auto-mode-alist '("\\.html?\\'" . web-mode))
+    
+    (defun web-mode-hook ()
+      "Hooks for Web mode."
+      (setq web-mode-markup-indent-offset 2)
+      (setq web-mode-css-indent-offset 2)
+      (setq web-mode-code-indent-offset 2)
+      (setq web-mode-indent-style 2)
+      (setq web-mode-disable-auto-pairing t)
+      (setq web-mode-disable-css-colorization t)
+    )
+    
+    (add-hook 'web-mode-hook 'web-mode-hook)
+  #+END_SRC
+* Utils Mode
+** mu4e (mail)
+
+- Initialize mu4e
+  #+BEGIN_SRC emacs-lisp
+    (require 'mu4e)
+    
+    ;; default
+    (setq mu4e-maildir (expand-file-name "/Users/vaiter/Maildir"))
+    
+    (setq mu4e-drafts-folder "/[Gmail].Drafts")
+    (setq mu4e-sent-folder   "/[Gmail].Sent Mail")
+    (setq mu4e-trash-folder  "/[Gmail].Trash")
+    
+    ;; don't save message to Sent Messages, GMail/IMAP will take care of this
+    (setq mu4e-sent-messages-behavior 'delete)
+    
+    ;; allow for updating mail using 'U' in the main view:
+    (setq mu4e-get-mail-command "offlineimap")
+    (setq mu4e-update-interval 60)
+  #+END_SRC
+
+- Shortcuts
+  #+BEGIN_SRC emacs-lisp
+    (setq mu4e-maildir-shortcuts
+          '(("/INBOX"             . ?i)
+            ("/[Gmail].Sent Mail" . ?s)
+            ("/[Gmail].Trash"     . ?t)))
+  #+END_SRC
+
+- Perso
+  #+BEGIN_SRC emacs-lisp
+    (setq
+     user-mail-address "samuel.vaiter@gmail.com"
+     user-full-name  "Samuel VAITER"
+     message-signature
+      (concat
+        "Samuel Vaiter\n"
+        "Ph. D. student at CNRS, Ceremade, Univ. Paris-Dauphine,\n"
+        "Place du Maréchal De Lattre De Tassigny,\n"
+        "75775 Paris Cedex 16 - FRANCE.\n"
+        "\n"
+        "Email: samuel.vaiter@gmail.com\n"
+        "Web: http://samuelvaiter.com")
+    )
+  #+END_SRC
+
+- SMPT config with gnutls
+  #+begin_src emacs-lisp
+    (require 'smtpmail)
+    
+    (setq message-send-mail-function 'smtpmail-send-it
+          starttls-use-gnutls t
+          smtpmail-starttls-credentials '(("smtp.gmail.com" 587 nil nil))
+          smtpmail-auth-credentials
+          '(("smtp.gmail.com" 587 "samuel.vaiter@gmail.com" nil))
+          smtpmail-default-smtp-server "smtp.gmail.com"
+          smtpmail-smtp-server "smtp.gmail.com"
+          smtpmail-smtp-service 587)
+  #+end_src
+
+- Be compatible with mu4e
+  #+BEGIN_SRC emacs-lisp
+    (eval-after-load 'mu4e
+      '(progn
+         ;; use the standard bindings as a base
+         (evil-make-overriding-map mu4e-view-mode-map 'normal t)
+         (evil-make-overriding-map mu4e-main-mode-map 'normal t)
+         (evil-make-overriding-map mu4e-headers-mode-map 'normal t)
+         
+         (evil-add-hjkl-bindings mu4e-view-mode-map 'normal
+           "J" 'mu4e~headers-jump-to-maildir
+           "j" 'evil-next-line
+           "C" 'mu4e-compose-new
+           "o" 'mu4e-view-message
+           "Q" 'mu4e-raw-view-quit-buffer)
+         
+         ;; (evil-add-hjkl-bindings mu4e-view-raw-mode-map 'normal
+         ;; "J" 'mu4e-jump-to-maildir
+         ;; "j" 'evil-next-line
+         ;; "C" 'mu4e-compose-new
+         ;; "q" 'mu4e-raw-view-quit-buffer)
+         
+         (evil-add-hjkl-bindings mu4e-headers-mode-map 'normal
+           "J" 'mu4e~headers-jump-to-maildir
+           "j" 'evil-next-line
+           "C" 'mu4e-compose-new
+           "o" 'mu4e-view-message
+           )
+         
+         (evil-add-hjkl-bindings mu4e-main-mode-map 'normal
+           "J" 'mu4e~headers-jump-to-maildir
+           "j" 'evil-next-line
+           "RET" 'mu4e-view-message)
+         ))
+  #+END_SRC
+
+- Custom headers
+  #+BEGIN_SRC emacs-lisp
+    (setq mu4e-headers-date-format "%x %R")
+    (setq mu4e-headers-fields
+          '( (:date       .  14)
+             (:flags      .   6)
+             (:from-or-to .  22)
+             (:subject    .  nil)))
+  #+END_SRC
+
+** Multi-term
+- Initialization
+  #+BEGIN_SRC emacs-lisp
+    (require 'multi-term)
+    (setq multi-term-program "/usr/local/bin/zsh")
+    (setq system-uses-terminfo nil)
+  #+END_SRC
+
+- No autopair in term
+  #+BEGIN_SRC emacs-lisp
+    (add-hook 'term-mode-hook
+      #'(lambda () (setq autopair-dont-activate t)))
+  #+END_SRC
+
+** Doc-View mode
+- Auto reload on modif
+  #+BEGIN_SRC emacs-lisp
+    (add-hook 'doc-view-mode-hook 'auto-revert-mode)
+  #+END_SRC
+  
+* Keybindings
+
+** Perspectives
+
+Perspectives are opened with C-c p(erspective) + one char.
+
+- Org-mode (link,agenda,buffer)
+  #+BEGIN_SRC emacs-lisp
+    (global-set-key "\C-cpl" 'org-store-link)
+    (global-set-key "\C-cpa" 'org-agenda)
+    (global-set-key "\C-cpb" 'org-iswitchb)
+  #+END_SRC
+
+- Django Project
+  #+BEGIN_SRC emacs-lisp
+    (global-set-key (kbd "C-c p d") 'python-django-open-project)
+  #+END_SRC
+
+- Mail (mu4e)
+  #+BEGIN_SRC emacs-lisp
+    (global-set-key (kbd "C-c p m") 'mu4e)
+  #+END_SRC
+
+- IRC
+  #+BEGIN_SRC emacs-lisp
+    (global-set-key (kbd "C-c p t") 'djcb-erc-start-or-switch) ;; ERC
+  #+END_SRC
+
+** Others
+
+- Find file with C-x f
+  #+begin_src emacs-lisp
+    (global-set-key (kbd "C-x f") 'find-file-at-point) ;; Remove set the fill-column
+  #+end_src
+
+- Toggle speedbar with s-]
+  #+begin_src emacs-lisp
+    (global-set-key (kbd "s-]") 'sr-speedbar-toggle)
+  #+end_src
+
+- M-x without it (C-x C-m)
+  #+begin_src emacs-lisp
+    (global-set-key "\C-x\C-m" 'execute-extended-command)
+  #+end_src
+
+- Ace Jump with SPC
+  #+BEGIN_SRC emacs-lisp
+    (define-key global-map (kbd "C-c SPC") 'ace-jump-mode)
+    (define-key evil-normal-state-map (kbd "SPC") 'ace-jump-mode)
+  #+END_SRC
+
+- Org-mode capture
+  #+BEGIN_SRC emacs-lisp
+    (global-set-key (kbd "C-M-r") 'org-capture)  
+  #+END_SRC
+
+- Rotate windows
+  #+BEGIN_SRC emacs-lisp
+    (global-set-key (kbd "C-c r") 'rotate-windows)
+  #+END_SRC
+
+- Switch theme
+  #+BEGIN_SRC emacs-lisp
+    (global-set-key (kbd "C-c §") 'sv/cycle-themes)
+  #+END_SRC
+
+- Yasnippet expand
+  #+BEGIN_SRC emacs-lisp
+    (global-set-key (kbd "C-c y e") 'yas-expand)
+    (global-set-key (kbd "C-c y i") 'yas-insert-snippet)
+  #+END_SRC
+
+- Multi-term next
+  #+BEGIN_SRC emacs-lisp
+    (global-set-key (kbd "C-c 1") 'multi-term-next)
+  #+END_SRC
+
+* Org-mode
+** Conflicts
+- Windmove
+  #+begin_src emacs-lisp
+    (add-hook 'org-shiftup-final-hook 'windmove-up)
+    (add-hook 'org-shiftleft-final-hook 'windmove-left)
+    (add-hook 'org-shiftdown-final-hook 'windmove-down)
+    (add-hook 'org-shiftright-final-hook 'windmove-right)
+  #+end_src
+
+** Org-babel config
+- Fontify in babel
+  #+begin_src emacs_lisp
+    (setq org-src-fontify-natively t)
+  #+end_src
+
