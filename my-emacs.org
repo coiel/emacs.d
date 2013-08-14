@@ -53,6 +53,12 @@ This section contains all the loading functions.
             :url "https://github.com/tkf/emacs-jedi.git"
             :depends (epc auto-complete)
             :features jedi)
+       (:name haskell-mode
+           :description "A Haskell editing mode"
+           :type github
+           :pkgname "haskell/haskell-mode"
+           :build ("make")
+           :load "haskell-mode-autoloads.el")
        (:name haxe-mode
             :website "https://bitbucket.org/jpsecher/haxe-mode"
             :description "NU/Emacs mode for editing haXe programs."
@@ -63,8 +69,8 @@ This section contains all the loading functions.
       (append
       '(smex
         undo-tree
-        evil
         auctex
+        evil
         haskell-mode
         yasnippet
         python
