@@ -520,6 +520,11 @@ Registers are obtained through C-x r j KEY
                                   (rdictcc-buffer-mode . emacs))
           do (evil-set-initial-state mode state))
   #+END_SRC
+
+- Don't overwrite cursor color
+  #+BEGIN_SRC emacs-lisp
+    (setq evil-default-cursor t) 
+  #+END_SRC
   
 ** Auto-complete
 - Init auto-complete
