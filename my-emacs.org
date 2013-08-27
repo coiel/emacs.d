@@ -25,6 +25,15 @@ This section contains all the loading functions.
           (eval-print-last-sexp))))
   #+end_src
 
+** Set package.el sources
+  #+BEGIN_SRC emacs-lisp
+    (require 'package)
+    (setq package-archives '(("gnu" . "http://elpa.gnu.org/packages/")
+                             ("marmalade" . "http://marmalade-repo.org/packages/")
+                             ("melpa" . "http://melpa.milkbox.net/packages/")))
+    (package-initialize)
+  #+END_SRC
+
 ** Package settings for el-get
   #+begin_src emacs-lisp
     (setq el-get-sources
@@ -434,7 +443,7 @@ Registers are obtained through C-x r j KEY
 
 - Default theme
   #+BEGIN_SRC emacs-lisp
-    (load-theme 'sanityinc-tomorrow-night t)
+    (load-theme 'mustang t)
     (setq sv/current-theme 'sanityinc-tomorrow-night)
     (setq sv/themes '(sanityinc-tomorrow-night
                       sanityinc-tomorrow-blue
