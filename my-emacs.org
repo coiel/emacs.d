@@ -420,9 +420,11 @@ Registers are obtained through C-x r j KEY
   #+BEGIN_SRC emacs-lisp
     (add-to-list 'load-path "~/.emacs.d/themes/solarized/")
     (add-to-list 'load-path "~/.emacs.d/themes/tomorrow/")
+    (add-to-list 'load-path "~/.emacs.d/themes/mustang/")
     (add-to-list 'custom-theme-load-path "~/.emacs.d/themes/solarized/")
     (add-to-list 'custom-theme-load-path "~/.emacs.d/themes/zenburn/")
     (add-to-list 'custom-theme-load-path "~/.emacs.d/themes/tomorrow/")
+    (add-to-list 'custom-theme-load-path "~/.emacs.d/themes/mustang/")
   #+END_SRC
 
 - Color Theme everywhere
@@ -441,9 +443,9 @@ Registers are obtained through C-x r j KEY
                       sanityinc-tomorrow-eighties
                       zenburn
                       solarized-light
-                      solarized-dark))
+                      solarized-dark
+                      mustang))
   #+END_SRC
-
 
 - Theme switcher helper
   #+BEGIN_SRC emacs-lisp
